@@ -1,0 +1,160 @@
+---
+title: "Multivariate Analysis (PCA) on Iris Dataset"
+author: "Tarun Kaushik"
+date: "2023-02-24"
+output: html_document
+---
+
+```{r}
+
+## creating species as two factor variable, if setosa then 1, else 0
+head(iris)
+Setosa <- ifelse(iris$Species == "setosa",1,0)
+iris$setosa <- Setosa
+new_iris <- iris[,-5]
+head(new_iris)
+new_iris$setosa <- as.factor(new_iris$setosa)
+iris2 <- new_iris[,1:4]
+head(iris2)
+
+## Finding means
+iris_cm <- colMeans(iris2)
+iris_s <- cov(iris2)
+#calculating the Mahalanobis distance for each observation in the iris2 data set using the mean and covariance matrix of the same data set.
+iris_d <- apply(iris2, MARGIN = 1, function(iris2)t(iris2 - iris_cm) %*% solve(iris_s) %*% (iris2 - iris_cm))
+iris_cm
+iris_s
+iris_d
+#performing a two-sample t-test on the Sepal.Length variable in the iris dataset, comparing the mean Sepal.Length between two groups: the setosa species (Setosa == "1") and the non-setosa species (Setosa == "0").
+with(data=iris,t.test(iris$Sepal.Length[Setosa=="1"],iris$Sepal.Length[Setosa=="0"],var.equal=TRUE))
+with(data=iris,t.test(iris$Sepal.Width[Setosa=="1"],iris$Sepal.Width[Setosa=="0"],var.equal=TRUE))
+with(data=iris,t.test(iris$Petal.Length[Setosa=="1"],iris$Petal.Length[Setosa=="0"],var.equal=TRUE))
+with(data=iris,t.test(iris$Petal.Width[Setosa=="1"],iris$Petal.Width[Setosa=="0"],var.equal=TRUE))
+
+library(corpcor)
+library(Hotelling)
+
+##performing a Hotelling's T-squared test on the Sepal.Length, Sepal.Width, Petal.Length, and Petal.Width variables in the iris2 dataset, grouped by the Setosa species variable in the same dataset.
+
+t2testiris <- hotelling.test(iris2$Sepal.Length + iris2$Sepal.Width + iris2$Petal.Length + iris$Petal.Width ~ Setosa, data=iris2)
+# Output of the function hotelling.test is given
+cat("T2 statistic =",t2testiris$stat[[1]],"\n")
+print(t2testiris)
+
+#  T2 statistic is located in the first element of the list "stat"
+
+# Levene's tests based on absolute differences around means using t-tests. Standarizing the sparrows data set with scale()
+
+matstand <- scale(iris2)
+head(matstand)
+matseto <- matstand[Setosa == "1",]
+matnoseto <- matstand[Setosa == "0",]
+vecmedianseto <- apply(matseto, 2, median)
+# in the above 2 represents column. Hence, we are asking for column median
+vecmedianseto
+
+vecmediannoseto <- apply(matnoseto, 2, median)
+#calculating the absolute deviation from the median for each element in a matrix matseto, where the median values are taken from a vector vecmedianseto
+
+matabsdevseto <- abs(matseto - matrix(rep(vecmedianseto,nrow(matseto)),nrow=nrow(matseto), byrow=TRUE))
+
+matabsdevnoseto <- abs(matnoseto - matrix(rep(vecmediannoseto,nrow(matnoseto)),nrow=nrow(matnoseto), byrow=TRUE))
+
+matabsdevnoseto
+
+#combining two matrices matabsdevseto and matabsdevnoseto into a single matrix matabsdev.all, where the two matrices are stacked vertically using the rbind() function.
+matabsdev.all <- rbind(matabsdevseto,matabsdevnoseto)
+matabsdev.all <- data.frame(Setosa, matabsdev.all)
+
+
+#performing a two-sample t-test on the absolute deviations from the median of the Sepal.Length variable in the matabsdev.all matrix, grouped by the Setosa variable.
+t.test(matabsdev.all$Sepal.Length[Setosa == "1"],matabsdev.all$Sepal.Length[Setosa == "0"], alternative="less",var.equal = TRUE)
+t.test(matabsdev.all$Sepal.Width[Setosa == "1"],matabsdev.all$Sepal.Width[Setosa == "0"], alternative="less",var.equal = TRUE)
+t.test(matabsdev.all$Petal.Length[Setosa == "1"],matabsdev.all$Petal.Length[Setosa == "0"], alternative="less",var.equal = TRUE)
+t.test(matabsdev.all$Petal.Width[Setosa == "1"],matabsdev.all$Petal.Width[Setosa == "0"], alternative="less",var.equal = TRUE)
+
+matstand
+
+matstand.all <- data.frame(Setosa, matstand)
+colnames(matstand.all) <- colnames(new_iris[1:5])
+t2testiris <- hotelling.test(iris2$Sepal.Length+iris2$Sepal.Width+iris2$Petal.Length+iris2$Petal.Width ~ Setosa,data=matstand.all)
+cat("T2 statistic =",t2testiris$stat[[1]],"\n")
+print(t2testiris)
+
+# In the above we standardized using scale function
+matabsdev.all
+
+# Leverne test is used to verify Homoscedasticity. It tests if the variance of two samples are # #equal. Levene's test is an inferential statistic used to assess the equality of variances for a #variable calculated for two or more groups.[1] Some common statistical procedures assume that #variances of the populations from which different samples are drawn are equal. Levene's test #assesses this assumption.
+
+
+library(carData)
+library(car)
+
+# mahalanobis
+iris_MD <- mahalanobis(iris2, iris_cm, iris_s)
+iris_MD
+new_iris$pvalues <- pchisq(iris_MD, df=3, lower.tail=FALSE)
+head(new_iris)
+
+
+
+###PCA Analysis
+
+head(iris[,-5:-6])
+# Using prcomp to compute the principal components (eigenvalues and eigenvectors). With scale=TRUE, variable means are set to zero, and variances set to one
+iris_pca <- prcomp(iris[,-5:-6],scale=TRUE)
+iris_pca
+summary(iris_pca)
+# sample scores stored in iris_pca$x
+# singular values (square roots of eigenvalues) stored in iris_pca$sdev
+# loadings (eigenvectors) are stored in iris_pca$rotation
+# variable means stored in iris_pca$center
+# variable standard deviations stored in iris_pca$scale
+# A table containing eigenvalues and %'s accounted, follows
+# Eigenvalues are sdev^2
+
+(eigen_iris <- iris_pca$sdev^2)
+names(eigen_iris) <- paste("PC",1:4,sep="")
+sumlambdas <- sum(eigen_iris)
+sumlambdas
+propvar <- eigen_iris/sumlambdas
+propvar
+cumvar_iris <- cumsum(propvar)
+cumvar_iris
+matlambdas <- rbind(eigen_iris,propvar,cumvar_iris)
+rownames(matlambdas) <- c("Eigenvalues","Prop. variance","Cum. prop. variance")
+round(matlambdas,4)
+#In the following output, the four principal components are labeled as PC1, PC2, PC3, and PC4. For each principal component the output provide the proportion of the total variance in the data that is explained by each principal component. For example, PC1 explains 72.96% of the total variance in the data, while PC2 explains 22.85% of the variance.
+summary(iris_pca)
+iris_pca$rotation
+print(iris_pca)
+## Sample scores stored in iris_pca$x
+iris_pca$x
+# Identifying the scores by their species
+irisp_pca <- cbind(data.frame(iris$Species),iris_pca$x)
+irisp_pca
+# Means of scores for all the PC's classified by species
+
+tabmeansPC <- aggregate(irisp_pca[,2:5],by=list(species=iris$Species),mean)
+tabmeansPC
+tabmeansPC <- tabmeansPC[rev(order(tabmeansPC$species)),]
+tabmeansPC
+tabfmeans <- t(tabmeansPC[,-1])
+tabfmeans
+colnames(tabfmeans) <- t(as.vector(tabmeansPC[1]$species))
+tabfmeans
+
+# Standard deviations of scores for all the PC's classified by Speices
+## In other words, it is reflecting how much of the original variation in the data is being captured by that component. If the standard deviation of a particular principal component is large, then that component is capturing a significant amount of the variation in the original data. If the standard deviation is small, then that component is not capturing as much of the variation in the data.
+
+tabsdsPC <- aggregate(irisp_pca[,2:5],by=list(species=iris$Species),sd)
+tabfsds <- t(tabsdsPC[,-1])
+colnames(tabfsds) <- t(as.vector(tabsdsPC[1]$species))
+tabfsds
+t.test(PC1~iris$setosa,data=irisp_pca)
+t.test(PC2~iris$setosa,data=irisp_pca)
+t.test(PC3~iris$setosa,data=irisp_pca)
+t.test(PC4~iris$setosa,data=irisp_pca)
+
+```
+
